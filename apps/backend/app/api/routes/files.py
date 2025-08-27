@@ -4,8 +4,9 @@ from pathlib import Path
 
 router = APIRouter()
 
-@router.get("/sample")
-def download_sample():
+
+@router.get("/sample", response_class=FileResponse)
+async def download_sample():
     """Return a sample text file for download."""
     file_path = Path(__file__).resolve().parent.parent.parent / "static" / "sample.txt"
     if not file_path.exists():
