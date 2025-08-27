@@ -1,0 +1,16 @@
+{
+    email you@example.com
+    # acme_ca https://acme-staging-v02.api.letsencrypt.org/directory  # uncomment for testing
+}
+
+app.example.com {
+    reverse_proxy frontend:3000
+}
+
+api.example.com {
+    reverse_proxy backend:8000
+}
+
+flow.example.com {
+    reverse_proxy n8n:5678
+}

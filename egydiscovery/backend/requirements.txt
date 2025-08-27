@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+sqlalchemy
+alembic
+psycopg2-binary
+redis
+python-jose
+passlib[bcrypt]
+pydantic
+pydantic-settings==2.6.1
+python-dotenv==1.0.1
+loguru
+requests
+orjson
+authlib
+beautifulsoup4

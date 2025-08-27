@@ -1,0 +1,91 @@
+{
+  "name": "Lead Outreach \u2014 Telegram",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "lead_outreach_telegram",
+        "methods": [
+          "POST"
+        ]
+      },
+      "id": "Webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        280,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://api.telegram.org/bot{{$env.TELEGRAM_BOT_TOKEN}}/sendMessage",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "chat_id",
+              "value": "={{$json[\"chat_id\"]}}"
+            },
+            {
+              "name": "text",
+              "value": "={{$json[\"message\"]}}"
+            }
+          ]
+        }
+      },
+      "id": "HTTP Request",
+      "name": "Telegram Send",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "responseMode": "lastNode",
+        "responseData": "allEntries",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "Respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        820,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Telegram Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Send": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false
+}

@@ -1,0 +1,106 @@
+{
+  "name": "Lead Outreach \u2014 Twilio WhatsApp (HTTP)",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "lead_outreach_whatsapp",
+        "methods": [
+          "POST"
+        ]
+      },
+      "id": "Webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        280,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "basicAuth",
+        "requestMethod": "POST",
+        "url": "https://api.twilio.com/2010-04-01/Accounts/{{$env.TWILIO_ACCOUNT_SID}}/Messages.json",
+        "jsonParameters": false,
+        "options": {},
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "From",
+              "value": "={{$env.TWILIO_WHATSAPP_FROM}}"
+            },
+            {
+              "name": "To",
+              "value": "=whatsapp:{{$json[\"to\"]}}"
+            },
+            {
+              "name": "Body",
+              "value": "={{$json[\"message\"]}}"
+            }
+          ]
+        },
+        "authenticationMethod": "predefinedCredentialType",
+        "genericAuthType": "basicAuth"
+      },
+      "id": "HTTP Request",
+      "name": "Twilio Send",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        560,
+        240
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "twilio-basic",
+          "name": "Twilio Basic"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "responseMode": "lastNode",
+        "responseData": "allEntries",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "Respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        820,
+        240
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Twilio Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Twilio Send": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false
+}

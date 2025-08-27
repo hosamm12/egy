@@ -1,0 +1,87 @@
+{
+  "name": "Lead Outreach \u2014 Email (SMTP)",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "lead_outreach_email",
+        "methods": [
+          "POST"
+        ]
+      },
+      "id": "Webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        280,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "binaryPropertyName": "",
+        "fromEmail": "={{$env.SMTP_FROM}}",
+        "toEmail": "={{$json[\"to\"]}}",
+        "subject": "={{$json[\"subject\"] || \"Hello from EgyDiscovery\"}}",
+        "text": "={{$json[\"message\"] || \"Hi!\"}}",
+        "options": {}
+      },
+      "id": "Email",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        560,
+        360
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "smtp-creds",
+          "name": "SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "responseMode": "lastNode",
+        "responseData": "allEntries",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "Respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        820,
+        360
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false
+}
