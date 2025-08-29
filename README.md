@@ -46,6 +46,16 @@ make up
 > For a managed PaaS, build the images using the provided GitHub Actions and deploy to services like
 > Fly.io, Render, Railway, or AWS ECS/Fargate. You only need to inject env vars and connect Postgres/Redis.
 
+### Vercel (frontend only)
+
+If you prefer a managed platform, the Next.js app can be deployed to [Vercel](https://vercel.com):
+
+1. Install the Vercel CLI and run `vercel` from the repo root. When prompted for the **project root**, enter `apps/frontend`.
+2. Vercel will build and deploy the site, returning a `<project>.vercel.app` subdomain.
+3. Optionally, assign a custom domain or subdomain in the Vercel dashboard under **Settings → Domains**.
+
+The included `vercel.json` routes all traffic to the frontend app so no extra configuration is needed.
+
 ---
 
 ## Services & Ports
