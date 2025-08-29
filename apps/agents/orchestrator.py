@@ -29,8 +29,12 @@ class Executor:
                 return {"status": "ok"}
             if step == "trigger_welcome_email":
                 # call backend celery task through a faux endpoint (health ping here as demo)
-                r = await client.get(f"{BACKEND}/health")
-                return {"status": "ok", "health": r.json()}
+                try:
+                    r = await client.get(f"{BACKEND}/health")
+                    health = r.json()
+                except (httpx.HTTPError, ValueError):
+                    health = {"error": "unreachable"}
+                return {"status": "ok", "health": health}
             return {"status": "noop"}
 
 async def main():
