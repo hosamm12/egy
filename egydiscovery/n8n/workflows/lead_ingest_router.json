@@ -1,0 +1,485 @@
+{
+  "name": "Lead Ingest Router",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "lead_ingest",
+        "methods": [
+          "POST"
+        ]
+      },
+      "id": "Webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Normalize & defaults\\nconst b = $json;\\nconst score = Number(b.score || 0);\\nconst tag = (b.tag||'').toLowerCase();\\nreturn [{...b, score, tag}];"
+      },
+      "id": "Normalize",
+      "name": "Normalize",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        420,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "http://backend:8000/api/v1/agents/route",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "prompt",
+              "value": "=enrich: {{$json[\"message\"] || $json[\"url\"] || $json[\"email\"]}}"
+            },
+            {
+              "name": "params",
+              "value": "={ \"agent\": \"enrich\", \"payload\": { \"extract\": $json[\"message\"] || '' } }"
+            }
+          ]
+        }
+      },
+      "id": "Enrich",
+      "name": "Enrich (if missing score)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        650,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json[\"score\"]}}",
+              "operation": "smaller",
+              "value2": 1
+            }
+          ]
+        }
+      },
+      "id": "IF_no_score",
+      "name": "IF: score missing/zero?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "http://backend:8000/api/v1/data/leads",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "source",
+              "value": "={{$json[\"source\"] || 'form'}}"
+            },
+            {
+              "name": "tag",
+              "value": "={{$json[\"tag\"] || 'site'}}"
+            },
+            {
+              "name": "payload",
+              "value": "={{$json}}"
+            }
+          ]
+        }
+      },
+      "id": "SaveLead",
+      "name": "Save Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json[\"score\"]}}",
+              "operation": "largerEqual",
+              "value2": 70
+            }
+          ]
+        }
+      },
+      "id": "IF_high",
+      "name": "IF: score >= 70",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json[\"score\"]}}",
+              "operation": "largerEqual",
+              "value2": 50
+            },
+            {
+              "value1": "={{$json[\"score\"]}}",
+              "operation": "smaller",
+              "value2": 70
+            }
+          ]
+        }
+      },
+      "id": "IF_mid",
+      "name": "IF: 50 <= score < 70",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "http://n8n:5678/webhook/lead_outreach_whatsapp",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "to",
+              "value": "={{$json[\"whatsapp\"]}}"
+            },
+            {
+              "name": "message",
+              "value": "=Hi {{$json[\"name\"]||'there'}}, thanks for your interest!"
+            }
+          ]
+        }
+      },
+      "id": "WA",
+      "name": "WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1320,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "http://n8n:5678/webhook/lead_outreach_email",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "to",
+              "value": "={{$json[\"email\"]}}"
+            },
+            {
+              "name": "subject",
+              "value": "=Welcome to EgyDiscovery"
+            },
+            {
+              "name": "message",
+              "value": "=Hi {{$json[\"name\"]||''}}, we will contact you shortly."
+            }
+          ]
+        }
+      },
+      "id": "EmailHigh",
+      "name": "Email (high)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1320,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "http://n8n:5678/webhook/lead_outreach_email",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "to",
+              "value": "={{$json[\"email\"]}}"
+            },
+            {
+              "name": "subject",
+              "value": "=Thanks for reaching out"
+            },
+            {
+              "name": "message",
+              "value": "=We received your inquiry."
+            }
+          ]
+        }
+      },
+      "id": "EmailMid",
+      "name": "Email (mid)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1320,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"tag\"]}}",
+              "operation": "contains",
+              "value2": "vip"
+            }
+          ]
+        }
+      },
+      "id": "IF_vip",
+      "name": "IF: VIP tag",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "http://n8n:5678/webhook/lead_outreach_telegram",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "chat_id",
+              "value": "={{$env.TELEGRAM_ALERT_CHAT || '123456'}}"
+            },
+            {
+              "name": "message",
+              "value": "=VIP lead: {{$json[\"name\"]||''}} {{$json[\"phone\"]||''}} score={{$json[\"score\"]}}"
+            }
+          ]
+        }
+      },
+      "id": "TG",
+      "name": "Telegram (VIP)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1320,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "responseMode": "lastNode",
+        "responseData": "allEntries",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "Respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1540,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize": {
+      "main": [
+        [
+          {
+            "node": "IF_no_score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF_no_score": {
+      "main": [
+        [
+          {
+            "node": "Enrich",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SaveLead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrich": {
+      "main": [
+        [
+          {
+            "node": "SaveLead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SaveLead": {
+      "main": [
+        [
+          {
+            "node": "IF_high",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF_mid",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF_vip",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF_high": {
+      "main": [
+        [
+          {
+            "node": "WA",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "EmailHigh",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "IF_mid": {
+      "main": [
+        [
+          {
+            "node": "EmailMid",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "IF_vip": {
+      "main": [
+        [
+          {
+            "node": "TG",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "WA": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "EmailHigh": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "EmailMid": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TG": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false
+}

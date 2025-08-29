@@ -1,0 +1,222 @@
+{
+  "name": "Domain Lead Ingest (egydiscavry.com)",
+  "active": false,
+  "settings": {},
+  "id": "db521048-50f8-4fe2-83bc-27d0e191b2b1",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "egydiscavry/lead/new",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {
+          "binaryData": false,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "Webhook",
+      "name": "Domain Webhook (egydiscavry.com)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -400,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Verify a simple HMAC-like shared secret header; adjust as needed.\n// Expect header: X-Lead-Secret: <SECRET_VALUE>\nconst required = $json.headers?.['x-lead-secret'] || $json.headers?.['X-Lead-Secret'];\nconst expected = $env.N8N_LEAD_SHARED_SECRET || 'CHANGE_ME_SECRET';\nif (!required || required !== expected) {\n  // Stop execution by throwing an error (will send 401 from response node later)\n  throw new Error('Unauthorized: invalid or missing X-Lead-Secret');\n}\nreturn items;\n"
+      },
+      "id": "VerifySecret",
+      "name": "Verify Shared Secret",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        -100,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Normalize incoming JSON (from webhook body) into a standard lead schema.\n// Supports payloads like {name, email, phone, source, message, tags[], role, interest_score, url}\nconst now = new Date().toISOString();\nreturn items.map(item => {\n  const body = item.json.body || item.json; // depending on webhook config\n  const headers = item.json.headers || {};\n  const lead = {\n    id: body.id || body.lead_id || body.uuid || $jmespath(item.json, 'query.id') || $json.id || Date.now().toString(),\n    name: body.name || body.full_name || '',\n    email: body.email || '',\n    phone: body.phone || body.whatsapp || '',\n    role: body.role || '',\n    buyer_seller_hint: body.buyer_seller_hint || body.role || '',\n    source: body.source || headers['host'] || 'domain-webhook',\n    url: body.url || body.profile_url || '',\n    message: body.message || body.note || '',\n    tags: body.tags || [],\n    interest_score: Number(body.interest_score || 0),\n    created_at: now,\n  };\n  return { json: lead };\n});\n"
+      },
+      "id": "ParseLead",
+      "name": "Parse Lead",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        150,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.buyer_seller_hint}}",
+              "operation": "contains",
+              "value2": "buyer"
+            },
+            {
+              "value1": "={{$json.message}}",
+              "operation": "contains",
+              "value2": "buy"
+            }
+          ]
+        }
+      },
+      "id": "BuyerCheck",
+      "name": "Buyer?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        400,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "requestMethod": "POST",
+        "url": "https://egydiscavry.com/api/leads/buyers",
+        "jsonParameters": true,
+        "options": {},
+        "sendBinaryData": false,
+        "specifyHeaders": true,
+        "headerParametersJson": "{\"Content-Type\":\"application/json\"}",
+        "jsonBody": "={{$json}}"
+      },
+      "id": "HTTPForward",
+      "name": "Forward to Buyers API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        700,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://egydiscavry.com/api/leads/archive",
+        "jsonParameters": true,
+        "options": {},
+        "sendBinaryData": false,
+        "specifyHeaders": true,
+        "headerParametersJson": "{\"Content-Type\":\"application/json\"}",
+        "jsonBody": "={{$json}}"
+      },
+      "id": "HTTPArchive",
+      "name": "Archive (Sellers/Other)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        700,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "responseBody": "={{ { success: true, id: $json.id, classification: $node[\"Buyer?\"].data?.main?.[0] ? 'buyer' : 'other' } }}",
+        "responseCode": 200
+      },
+      "id": "RespondOK",
+      "name": "Respond 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Domain Webhook (egydiscavry.com)": {
+      "main": [
+        [
+          {
+            "node": "Verify Shared Secret",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Shared Secret": {
+      "main": [
+        [
+          {
+            "node": "Parse Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Lead": {
+      "main": [
+        [
+          {
+            "node": "Buyer?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buyer?": {
+      "main": [
+        [
+          {
+            "node": "Forward to Buyers API",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Archive (Sellers/Other)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Forward to Buyers API": {
+      "main": [
+        [
+          {
+            "node": "Respond 200",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Archive (Sellers/Other)": {
+      "main": [
+        [
+          {
+            "node": "Respond 200",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "meta": {
+    "instanceId": "780b6a03-b63f-4fc5-a9f9-0b91cbb76559",
+    "createdAt": "2025-08-24T21:02:23Z",
+    "updatedAt": "2025-08-24T21:02:23Z",
+    "cli": "generated-by-chatgpt"
+  }
+}

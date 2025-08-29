@@ -1,0 +1,29 @@
+name: Build & Push (backend/frontend)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build backend
+        run: |
+          docker build -t ghcr.io/${{ github.repository }}/backend:latest -f backend/Dockerfile .
+          docker push ghcr.io/${{ github.repository }}/backend:latest
+      - name: Build frontend
+        run: |
+          docker build -t ghcr.io/${{ github.repository }}/frontend:latest -f frontend/Dockerfile .
+          docker push ghcr.io/${{ github.repository }}/frontend:latest

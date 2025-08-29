@@ -1,0 +1,57 @@
+version: "3.9"
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: app
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+    volumes: ["redisdata:/data"]
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file: [.env]
+    depends_on: [postgres]
+    ports: ["8000:8000"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes: ["./backend/app:/app/app"]
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    environment:
+      - NEXT_PUBLIC_API_BASE=http://localhost:8000
+    ports: ["3000:3000"]
+    depends_on: [backend]
+  n8n:
+    image: n8nio/n8n:latest
+    env_file: [.env]
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_USER=app
+      - DB_POSTGRESDB_PASSWORD=app
+      - DB_POSTGRESDB_DATABASE=app
+      - EXECUTIONS_MODE=queue
+      - QUEUE_BULL_REDIS_HOST=redis
+      - QUEUE_BULL_REDIS_PORT=6379
+    ports: ["5678:5678"]
+    depends_on: [postgres, redis]
+    volumes: ["n8ndata:/home/node/.n8n"]
+volumes:
+  pgdata:
+  redisdata:
+  n8ndata:

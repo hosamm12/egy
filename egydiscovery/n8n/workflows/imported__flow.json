@@ -1,0 +1,188 @@
+{
+  "name": "EgyDiscovery Lead \u2192 Package \u2192 Payment \u2192 Agents",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "booking-webhook",
+        "options": {}
+      },
+      "id": "Webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://api.egydiscabry.com/api/packages/save",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={\"title\":\"={{$json.place}} Trip\",\"location\":\"={{$json.place}}\",\"start_date\":\"={{$json.date}}\",\"people\":\"={{$json.people}}\",\"photos\":{{$json.photos}}}"
+      },
+      "id": "SavePackage",
+      "name": "Save Package",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        580,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://api.egydiscabry.com/api/leads/upsert",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "=[{\"name\":\"={{$json.name}}\",\"profile_url\":\"={{$json.profile}}\",\"source\":\"web\",\"note\":\"={{$json.intent}}\"}]"
+      },
+      "id": "UpsertLead",
+      "name": "Upsert Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        580,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "modelId": "gpt-4o-mini",
+        "text": "=Create a warm confirmation text for a {{$json.place}} trip for {{$json.people}} people on {{$json.date}}."
+      },
+      "id": "OpenAI",
+      "name": "OpenAI (Text)",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 2,
+      "position": [
+        820,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://api.stripe.com/v1/payment_links",
+        "authentication": "predefinedCredentialType",
+        "jsonParameters": true,
+        "options": {},
+        "sendQuery": true,
+        "queryParameters": [
+          {
+            "name": "line_items[0][price]",
+            "value": "{{ $json.price_id }}"
+          },
+          {
+            "name": "line_items[0][quantity]",
+            "value": "1"
+          }
+        ]
+      },
+      "id": "StripeLink",
+      "name": "Stripe Payment Link",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1060,
+        300
+      ],
+      "credentials": {
+        "httpBasicAuth": "Stripe Account"
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "channel": "={{$json.slack_channel}}",
+        "text": "=New booking lead for {{$json.place}}. Payment link: {{$json.payment_url}}"
+      },
+      "id": "NotifySlack",
+      "name": "Notify Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [
+        1300,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://api.egydiscabry.com/api/handoff",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={\"booking_id\":\"={{$json.bookingId}}\"}"
+      },
+      "id": "Handoff",
+      "name": "Handoff to Master & Account Agents",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1540,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "UpsertLead",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "SavePackage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Package": {
+      "main": [
+        [
+          {
+            "node": "OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI": {
+      "main": [
+        [
+          {
+            "node": "Stripe Payment Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stripe Payment Link": {
+      "main": [
+        [
+          {
+            "node": "Notify Slack",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
