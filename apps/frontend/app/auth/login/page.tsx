@@ -1,12 +1,12 @@
 'use client';
-import { useState } from 'react';
+import { useState, FormEvent } from 'react';
 
 export default function Login() {
   const [email, setEmail] = useState('admin@example.com');
   const [password, setPassword] = useState('admin123');
   const [message, setMessage] = useState('');
 
-  const onSubmit = async (e) => {
+  const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const api = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     const res = await fetch(`${api}/auth/login`, {
