@@ -32,11 +32,20 @@ class Executor:
                 # call backend celery task through a faux endpoint (health ping here as demo)
                 try:
                     r = await client.get(f"{BACKEND}/health")
-                    r.raise_for_status()
-                    health = r.json()
-                except (httpx.HTTPError, ValueError) as exc:
-                    logger.warning("backend health check failed: %s", exc)
+                except httpx.RequestError as exc:
+                    logger.warning("backend health check request failed: %s", exc)
                     return {"status": "ok"}
+
+                if not r.is_success:
+                    logger.warning("backend health check returned %s", r.status_code)
+                    return {"status": "ok"}
+
+                try:
+                    health = r.json()
+                except ValueError as exc:
+                    logger.warning("backend health check invalid JSON: %s", exc)
+                    return {"status": "ok"}
+
                 return {"status": "ok", "health": health}
             return {"status": "noop"}
 
