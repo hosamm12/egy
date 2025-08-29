@@ -1,7 +1,13 @@
-import os, asyncio, httpx
+import asyncio
+import logging
+import os
+
+import httpx
 from pydantic import BaseModel
 
 BACKEND = os.getenv("AGENTS_BACKEND_URL", "http://backend:8000")
+
+logger = logging.getLogger(__name__)
 
 class Task(BaseModel):
     type: str
@@ -29,8 +35,25 @@ class Executor:
                 return {"status": "ok"}
             if step == "trigger_welcome_email":
                 # call backend celery task through a faux endpoint (health ping here as demo)
-                r = await client.get(f"{BACKEND}/health")
-                return {"status": "ok", "health": r.json()}
+                try:
+                    r = await client.get(f"{BACKEND}/health")
+                    r.raise_for_status()
+                except httpx.RequestError as exc:
+                    logger.warning("backend health check request failed: %s", exc)
+                    return {"status": "ok"}
+                except httpx.HTTPStatusError as exc:
+                    logger.warning(
+                        "backend health check returned %s", exc.response.status_code
+                    )
+                    return {"status": "ok"}
+
+                try:
+                    health = r.json()
+                except ValueError as exc:
+                    logger.warning("backend health check invalid JSON: %s", exc)
+                    return {"status": "ok"}
+
+                return {"status": "ok", "health": health}
             return {"status": "noop"}
 
 async def main():
@@ -46,4 +69,5 @@ async def main():
         print("[agents] Step:", step, "=>", result)
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     asyncio.run(main())
