@@ -1,9 +1,12 @@
-import os, asyncio, httpx, logging
+import asyncio
+import logging
+import os
+
+import httpx
 from pydantic import BaseModel
 
 BACKEND = os.getenv("AGENTS_BACKEND_URL", "http://backend:8000")
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class Task(BaseModel):
@@ -66,4 +69,5 @@ async def main():
         print("[agents] Step:", step, "=>", result)
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     asyncio.run(main())
