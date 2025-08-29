@@ -1,7 +1,8 @@
-import os, asyncio, httpx
+import os, asyncio, httpx, logging
 from pydantic import BaseModel
 
 BACKEND = os.getenv("AGENTS_BACKEND_URL", "http://backend:8000")
+logger = logging.getLogger(__name__)
 
 class Task(BaseModel):
     type: str
@@ -31,9 +32,11 @@ class Executor:
                 # call backend celery task through a faux endpoint (health ping here as demo)
                 try:
                     r = await client.get(f"{BACKEND}/health")
+                    r.raise_for_status()
                     health = r.json()
-                except (httpx.HTTPError, ValueError):
-                    health = {"error": "unreachable"}
+                except (httpx.HTTPError, ValueError) as exc:
+                    logger.warning("backend health check failed: %s", exc)
+                    return {"status": "ok"}
                 return {"status": "ok", "health": health}
             return {"status": "noop"}
 
