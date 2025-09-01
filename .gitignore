@@ -1,0 +1,15 @@
+# Node
+node_modules/
+apps/frontend/node_modules/
+apps/frontend/.next/
+
+# Python
+__pycache__/
+*.pyc
+
+# Environment
+.env
+
+# Vercel
+.vercel/
+
