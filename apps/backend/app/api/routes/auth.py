@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
-from app.db.session import SessionLocal
 from app.db import models
 from app.core.security import verify_password, get_password_hash, create_access_token
 from app.api.deps import get_db, get_current_user
