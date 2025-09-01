@@ -7,7 +7,7 @@ export default function Register() {
   const [fullName, setFullName] = useState('User');
   const [message, setMessage] = useState('');
 
-  const onSubmit = async (e) => {
+  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const api = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     const res = await fetch(`${api}/auth/register`, {

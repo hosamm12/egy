@@ -46,6 +46,14 @@ make up
 > For a managed PaaS, build the images using the provided GitHub Actions and deploy to services like
 > Fly.io, Render, Railway, or AWS ECS/Fargate. You only need to inject env vars and connect Postgres/Redis.
 
+## Deploying the frontend on Vercel
+
+This repo includes a `vercel.json` that tells Vercel to build the Next.js app from
+`apps/frontend`. Connect your GitHub repository to Vercel and it will automatically
+install dependencies and run `npm run build` for that directory. The backend and other
+services should be deployed separately (for example using Docker Compose or another
+PaaS). Add any required API URLs as environment variables in your Vercel project.
+
 ---
 
 ## Services & Ports
