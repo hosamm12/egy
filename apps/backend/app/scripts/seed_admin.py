@@ -1,10 +1,12 @@
-import os
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
 from app.db.models import User
 from app.core.security import get_password_hash
+from app.core.config import settings
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
+DATABASE_URL = settings.DATABASE_URL
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL is not configured")
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 def seed():
