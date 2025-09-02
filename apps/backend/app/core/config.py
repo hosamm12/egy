@@ -16,12 +16,13 @@ class Settings(BaseSettings):
     @classmethod
     def assemble_cors(cls, v):
         if isinstance(v, str):
-            # Allow JSON-like list in env
+            # Allow JSON-formatted lists or comma-separated strings in env
             try:
                 import json
                 return json.loads(v)
             except Exception:
-                return [v]
+                # Fallback to comma-separated list
+                return [i.strip() for i in v.split(",") if i.strip()]
         return v
 
     model_config = SettingsConfigDict(env_file=".env")
