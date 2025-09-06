@@ -1,0 +1,65 @@
+name: Auto Hardener
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  harden:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create branch
+        run: |
+          branch="bot/hardening-$(date -u +%Y%m%d)"
+          git checkout -b "$branch"
+          echo "BRANCH=$branch" >> $GITHUB_ENV
+      - name: Add vercel.json
+        run: |
+          if [ ! -f vercel.json ]; then
+            cat <<'JSON' > vercel.json
+{
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {"key": "Content-Security-Policy", "value": "default-src 'self'"},
+        {"key": "X-Frame-Options", "value": "DENY"},
+        {"key": "X-Content-Type-Options", "value": "nosniff"},
+        {"key": "Referrer-Policy", "value": "strict-origin-when-cross-origin"},
+        {"key": "Permissions-Policy", "value": "geolocation=()"}
+      ]
+    }
+  ]
+}
+JSON
+            git add vercel.json
+          fi
+      - name: Add .npmrc
+        run: |
+          if [ -f package-lock.json ] && [ ! -f .npmrc ]; then
+            echo 'package-lock=true' > .npmrc
+            git add .npmrc
+          fi
+      - name: Add Security CI badge
+        run: |
+          if [ -f README.md ] && ! grep -q 'Security CI' README.md; then
+            sed -i '1i![Security CI](https://github.com/${{ github.repository }}/actions/workflows/security-ci.yml/badge.svg)' README.md
+            git add README.md
+          fi
+      - name: Commit and create PR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if git diff --cached --quiet; then
+            echo "No changes" && exit 0
+          fi
+          git commit -m "chore(security): auto-hardening update"
+          git push origin "$BRANCH"
+          gh pr create --title "chore(security): auto-hardening update" --body "Automated security hardening" --head "$BRANCH" --base main

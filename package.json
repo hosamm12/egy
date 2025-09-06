@@ -1,0 +1,10 @@
+{
+  "name": "egy",
+  "private": true,
+  "devDependencies": {
+    "husky": "^8.0.0"
+  },
+  "scripts": {
+    "postinstall": "husky install"
+  }
+}
