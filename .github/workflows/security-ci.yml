@@ -1,0 +1,195 @@
+name: Security CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '*/15 * * * *'
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  codeql:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: github/codeql-action/init@v2
+        with:
+          languages: javascript,python
+      - uses: github/codeql-action/analyze@v2
+
+  semgrep:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: returntocorp/semgrep-action@v1
+        with:
+          config: p/owasp-top-ten
+          publishToken: ${{ secrets.SEMGREP_APP_TOKEN }}
+          sarif: semgrep.sarif
+      - uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: semgrep.sarif
+
+  gitleaks:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gitleaks/gitleaks-action@v2
+        with:
+          args: --report-format=json --report-path=gitleaks-report.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: gitleaks-report.json
+
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v3
+        with:
+          fail-on-severity: high
+
+  nlp-intent-risk:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      risk: ${{ steps.risk.outputs.level }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: diff
+        run: git diff origin/${{ github.base_ref }}... > diff.txt
+      - id: risk
+        run: |
+          diff=$(cat diff.txt)
+          critical='(NODE_TLS_REJECT_UNAUTHORIZED|InsecureSkipVerify|verify=False|MD5|DES|open\\(.*/etc|open\\(.*~/|shell=True|shell=true|require\\(process.env|import\\s+os\\.environ|getenv|http://|unsafe-eval|NSAllowsArbitraryLoads|cleartextTrafficPermitted="true"|android:exported="true")'
+          suspicious='(eval\\(|exec\\(|subprocess|android:debuggable="true")'
+          level=low
+          if echo "$diff" | grep -Eqi "$critical"; then
+            level=high
+          elif echo "$diff" | grep -Eqi "$suspicious"; then
+            level=medium
+          fi
+          echo "$level" > risk.txt
+          echo "level=$level" >> $GITHUB_OUTPUT
+      - uses: actions/upload-artifact@v4
+        with:
+          name: intent-risk
+          path: risk.txt
+
+  light-hash:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          git ls-files | sort | xargs cat | sha256sum | cut -d' ' -f1 > .security_hash
+      - uses: actions/upload-artifact@v4
+        with:
+          name: security_hash
+          path: .security_hash
+
+  score:
+    needs: [codeql, semgrep, gitleaks, dependency-review, nlp-intent-risk]
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: gitleaks-report
+          path: .
+        if: always()
+      - uses: actions/download-artifact@v4
+        with:
+          name: intent-risk
+          path: .
+        if: always()
+      - name: Gather results
+        run: |
+          score=10
+          highEvent=0
+          if [ -f gitleaks-report.json ] && [ $(jq '.findings | length' gitleaks-report.json 2>/dev/null || echo 0) -gt 0 ]; then
+            score=$((score-5))
+            highEvent=1
+          fi
+          risk=$(cat risk.txt 2>/dev/null || echo low)
+          if [ "$risk" = "high" ]; then
+            score=$((score-3))
+            highEvent=1
+          elif [ "$risk" = "medium" ]; then
+            score=$((score-1))
+          fi
+          now=$(date -u +%s)
+          state=.github/security_state.json
+          mkdir -p .github
+          if [ -f $state ]; then
+            jq --argjson now $now '.highEvents=[.highEvents[]|select($now - . <= 604800)]' $state > tmp && mv tmp $state
+          else
+            echo '{"highEvents":[]}' > $state
+          fi
+          if [ $highEvent -eq 1 ]; then
+            jq --argjson now $now '.highEvents += [$now]' $state > tmp && mv tmp $state
+          fi
+          count=$(jq '.highEvents|length' $state)
+          if [ $count -ge 2 ]; then
+            escalated=1
+          else
+            escalated=0
+          fi
+          strategy=1
+          if [ $score -le 3 ]; then
+            strategy=3
+          elif [ $score -le 6 ]; then
+            strategy=2
+          fi
+          if [ $escalated -eq 1 ] && [ $strategy -lt 2 ]; then
+            strategy=2
+          fi
+          echo $score > SECURITY_SCORE.txt
+          echo $strategy > STRATEGY.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: security-score
+          path: |
+            SECURITY_SCORE.txt
+            STRATEGY.txt
+            .github/security_state.json
+      - uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const score = fs.readFileSync('SECURITY_SCORE.txt','utf8').trim();
+            const strategy = fs.readFileSync('STRATEGY.txt','utf8').trim();
+            const risk = fs.readFileSync('risk.txt','utf8').trim();
+            const body = `<!-- security-ci -->\n**Security Score:** ${score}\n**Intent Risk:** ${risk}\n**Strategy:** ${strategy}`;
+            const {data: comments} = await github.rest.issues.listComments({owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number});
+            const existing = comments.find(c => c.body.includes('<!-- security-ci -->'));
+            if (existing) {
+              await github.rest.issues.updateComment({owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body});
+            } else {
+              await github.rest.issues.createComment({owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body});
+            }
+      - name: Enforce strategy
+        run: |
+          strategy=$(cat STRATEGY.txt)
+          if [ "$strategy" -eq 3 ]; then
+            echo "Strategy 3: failing workflow" >&2
+            exit 1
+          fi

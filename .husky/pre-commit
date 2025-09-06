@@ -1,0 +1,8 @@
+#!/bin/sh
+
+files=$(git diff --cached --name-only | grep -E '(\.env|\.p12|\.mobileprovision|keystore\.jks|Appfile|\.pem|\.key)' | grep -vFf .allowlist-secrets || true)
+if [ -n "$files" ]; then
+  echo "Blocked sensitive files:"
+  echo "$files"
+  exit 1
+fi

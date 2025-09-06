@@ -1,0 +1,38 @@
+name: Security Hash
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  hash:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Compute hash
+        run: |
+          git ls-files | sort | xargs cat | sha256sum | cut -d' ' -f1 > .security_hash
+      - uses: actions/upload-artifact@v4
+        with:
+          name: security-hash
+          path: .security_hash
+      - uses: actions/github-script@v6
+        if: github.event_name == 'pull_request'
+        with:
+          script: |
+            const fs = require('fs');
+            const hash = fs.readFileSync('.security_hash','utf8').trim();
+            const body = `<!-- security-hash -->\n**Security Hash:** ${hash}`;
+            const {data: comments} = await github.rest.issues.listComments({owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number});
+            const existing = comments.find(c => c.body.includes('<!-- security-hash -->'));
+            if (existing) {
+              await github.rest.issues.updateComment({owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body});
+            } else {
+              await github.rest.issues.createComment({owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body});
+            }

@@ -9,6 +9,14 @@ __pycache__/
 
 # Environment
 .env
+.env.*
+*.p12
+*.mobileprovision
+keystore.jks
+fastlane/Appfile
+*.pem
+*.key
+*.tsbuildinfo
 
 # Vercel
 .vercel/

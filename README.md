@@ -56,6 +56,22 @@ PaaS). Add any required API URLs as environment variables in your Vercel project
 
 ---
 
+## Deploy (Vercel + GoDaddy DNS)
+
+1. **Vercel**: In your Vercel dashboard, add the domain and link it to this project.
+2. **GoDaddy DNS**:
+   - `A` record: `@` → `76.76.21.21`
+   - `CNAME`: `www` → `cname.vercel-dns.com`
+   - If Vercel asks for verification, add the provided temporary `TXT` record.
+3. Wait for DNS propagation (typically minutes, up to 24h).
+4. Verify records:
+   ```bash
+   dig @8.8.8.8 yourdomain.com +short
+   dig @8.8.8.8 www.yourdomain.com +short
+   ```
+
+---
+
 ## Services & Ports
 - Frontend (Next.js): `3000`
 - Backend (FastAPI): `8000`
