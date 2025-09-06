@@ -1,0 +1,150 @@
+name: PR Security Deep Scan
+
+on:
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  deep-security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # -------- GITLEAKS (secrets) --------
+      - name: Gitleaks (detect secrets)
+        id: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        continue-on-error: true
+        with:
+          args: detect --source . --no-git --report-format json --report-path gitleaks.json --exit-code 1
+
+      # -------- SEMGREP (SAST) --------
+      - name: Semgrep (SAST)
+        id: semgrep
+        uses: returntocorp/semgrep-action@v1
+        continue-on-error: true
+        with:
+          config: p/ci
+          generateSarif: true
+          sarifFile: semgrep.sarif
+
+      - name: Upload Semgrep SARIF to code scanning
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+        continue-on-error: true
+
+      # -------- TRIVY (deps & images) --------
+      - name: Trivy FS scan (critical/high)
+        id: trivy
+        uses: aquasecurity/trivy-action@0.20.0
+        continue-on-error: true
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: json
+          output: trivy.json
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: CRITICAL,HIGH
+
+      # -------- Dependency Review (GitHub native) --------
+      - name: Dependency Review (PR changes)
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+        continue-on-error: true
+
+      # -------- Compute repo fingerprint (hash) --------
+      - name: Compute repository fingerprint
+        id: fingerprint
+        run: |
+          set -euo pipefail
+          find . -type f -not -path "./.git/*" -print0 \
+            | sort -z \
+            | xargs -0 shasum -a 256 \
+            | shasum -a 256 \
+            | awk '{print $1}' > repo.hash
+          echo "hash=$(cat repo.hash)" >> $GITHUB_OUTPUT
+
+      # -------- Score & Summary --------
+      - name: Score & Summary
+        id: score
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Prepare jq
+          sudo apt-get update -y && sudo apt-get install -y jq >/dev/null
+
+          # Parse Gitleaks
+          GITLEAKS_FOUND=0
+          if [ -s gitleaks.json ]; then
+            GITLEAKS_FOUND=$(jq 'length' gitleaks.json || echo 0)
+          fi
+
+          # Parse Trivy
+          TRIVY_CRITICAL=0
+          TRIVY_HIGH=0
+          if [ -s trivy.json ]; then
+            TRIVY_CRITICAL=$(jq '[..|.Severity?//empty | select(.=="CRITICAL")] | length' trivy.json || echo 0)
+            TRIVY_HIGH=$(jq '[..|.Severity?//empty | select(.=="HIGH")] | length' trivy.json || echo 0)
+          fi
+
+          # Parse Semgrep SARIF (count high/critical by rule severity if present)
+          SEMGREP_HIGH=0
+          if [ -s semgrep.sarif ]; then
+            SEMGREP_HIGH=$(jq '[.runs[].results[]? | .level?] | map(select(.=="error")) | length' semgrep.sarif || echo 0)
+          fi
+
+          SCORE=3
+          CLASS="SECURE"
+          REASONS=()
+
+          if [ "$GITLEAKS_FOUND" -gt 0 ] || [ "$TRIVY_CRITICAL" -gt 0 ]; then
+            SCORE=1
+            CLASS="OFFLINE"
+            REASONS+=("Secrets or CRITICAL vulns found")
+          elif [ "$TRIVY_HIGH" -gt 0 ] || [ "$SEMGREP_HIGH" -gt 0 ]; then
+            SCORE=2
+            CLASS="WARNING"
+            REASONS+=("HIGH vulns or SAST errors")
+          fi
+
+          # verdict.json
+          printf '%s\n' \
+          "{ \"score\": $SCORE, \"classification\": \"$CLASS\", \"reasons\": $(printf '%s\n' \"$(printf '%s\n' \"${REASONS[@]:-}\" | jq -R . | jq -s .)\"), \"repo_hash\": \"${{ steps.fingerprint.outputs.hash }}\", \"gitleaks\": $GITLEAKS_FOUND, \"trivy_critical\": $TRIVY_CRITICAL, \"trivy_high\": $TRIVY_HIGH, \"semgrep_high\": $SEMGREP_HIGH, \"timestamp\": \"$(date -u +%FT%TZ)\" }" \
+          > verdict.json
+
+          {
+            echo "## 🔐 PR Security Deep Scan"
+            echo ""
+            echo "**Score:** $SCORE  |  **Class:** \`$CLASS\`"
+            echo ""
+            echo "- Secrets (gitleaks): **$GITLEAKS_FOUND**"
+            echo "- Trivy: CRITICAL **$TRIVY_CRITICAL**, HIGH **$TRIVY_HIGH**"
+            echo "- Semgrep (level=error): **$SEMGREP_HIGH**"
+            echo "- Repo hash: \`${{ steps.fingerprint.outputs.hash }}\`"
+            if [ "${#REASONS[@]}" -gt 0 ]; then
+              echo ""
+              echo "**Reasons:**"
+              for r in "${REASONS[@]}"; do echo "- $r"; done
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload artifacts (verdict & hash & logs)
+        uses: actions/upload-artifact@v4
+        with:
+          name: deep-security-artifacts
+          path: |
+            verdict.json
+            repo.hash
+            gitleaks.json
+            trivy.json
+            semgrep.sarif

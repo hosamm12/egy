@@ -1,0 +1,54 @@
+name: Auto Hardening Bot
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  harden:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply security headers & .gitignore if missing
+        run: |
+          set -euo pipefail
+
+          mkdir -p .github
+
+          # vercel.json with strict headers (idempotent)
+          cat > vercel.json <<'EOJSON'
+          {
+            "version": 2,
+            "headers": [
+              {
+                "source": "/(.*)",
+                "headers": [
+                  { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains; preload" },
+                  { "key": "X-Frame-Options", "value": "DENY" },
+                  { "key": "X-Content-Type-Options", "value": "nosniff" },
+                  { "key": "Referrer-Policy", "value": "no-referrer" },
+                  { "key": "Permissions-Policy", "value": "geolocation=(), microphone=(), camera=(), payment=()" },
+                  { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https:;" }
+                ]
+              }
+            ]
+          }
+          EOJSON
+
+          # Minimal .gitignore (append if not exists)
+          if [ ! -f .gitignore ]; then
+            printf '%s\n' ".DS_Store" "node_modules/" "dist/" "build/" ".env" >> .gitignore
+          fi
+
+      - name: Create PR
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: security/hardening-bot
+          title: "chore(security): apply strict headers & .gitignore"
+          commit-message: "chore(security): apply strict headers & .gitignore"
+          body: "Auto hardening: adds vercel.json headers + basic .gitignore"
+          labels: security, automation
