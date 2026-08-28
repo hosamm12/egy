@@ -1,0 +1,3 @@
+AGENT_SECURITY_TEST_MARKER=synthetic-only-2026
+This is a harmless, clearly-identified test artifact created during an authorized self-assessment.
+No secrets, no destructive actions.
