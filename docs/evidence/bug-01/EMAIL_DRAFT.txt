@@ -1,0 +1,3 @@
+Subject: Design question: scheduled Actions workflows with contents:write created by AI coding agents (no extra API confirmation)
+
+Full draft is in the researcher zip (bug1-final.zip). PR #13 is Codex. PR #15 is R2 probe. Do not merge either to main.

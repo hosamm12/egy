@@ -1,0 +1,1 @@
+See attached local pack bug1-final/REPORT.md — packaged 2026-08-29. Primary sendable files are REPORT.md and EMAIL_DRAFT.txt in the zip delivered to the researcher.
