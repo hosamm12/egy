@@ -15,10 +15,20 @@ from app.db.session import init_db
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger("egysaas")
 
-app = FastAPI(title="EgySaaS Backend", version="1.0.0")
+docs = None if settings.is_production else "/docs"
+redoc = None if settings.is_production else "/redoc"
+openapi = None if settings.is_production else "/openapi.json"
+
+app = FastAPI(
+    title="EgySaaS Backend",
+    version="1.0.0",
+    docs_url=docs,
+    redoc_url=redoc,
+    openapi_url=openapi,
+)
 
 origins = [str(o).rstrip("/") for o in settings.BACKEND_CORS_ORIGINS]
-origins = [o for o in origins if 'localhost' not in o and '127.0.0.1' not in o]
+origins = [o for o in origins if "localhost" not in o and "127.0.0.1" not in o]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
