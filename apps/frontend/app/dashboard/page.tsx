@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { getApiBase } from '../../lib/api';
 
 export default function Dashboard() {
   const [me, setMe] = useState(null);
@@ -12,8 +13,12 @@ export default function Dashboard() {
       return;
     }
     const fetchMe = async () => {
-      const api = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const res = await fetch(`${api}/auth/me`, {
+      const api = getApiBase();
+      if (!api.ok) {
+        setError(api.reason);
+        return;
+      }
+      const res = await fetch(`${api.base}/api/v1/auth/me`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();

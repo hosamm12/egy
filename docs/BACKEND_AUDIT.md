@@ -7,8 +7,7 @@ Frontend Next.js → FastAPI (`/auth` and `/api/v1/*`) → PostgreSQL.
 Redis/Celery and `apps/agents` remain demo services. No trip/booking domain exists in the frontend, so none was invented.
 
 Deployment: Docker Compose / GHCR image build. FastAPI is **not** hosted as the Vercel runtime.
-Vercel project `egy` was set to Blitz/Next at the **repo root**, so builds failed with NEXT_NO_VERSION until a root `package.json` + `vercel.json` pointed install/build at `apps/frontend`.
-Vercel project `egy-thfd` being READY only means a framework-less empty build succeeded — it is not proof of production API/DB health.
+Vercel project `egy` preview can build Next. That does not prove API or database health.
 
 ## Implemented
 - JWT subject is user id; inactive users blocked
@@ -21,11 +20,12 @@ Vercel project `egy-thfd` being READY only means a framework-less empty build su
 - Alembic migration `0001_users`
 - `create_all` only outside production
 - Admin seed requires `ADMIN_PASSWORD` env
-- Pytest in `blank.yml` (the workflow that actually runs jobs) and `backend-ci.yml`
+- Deployed frontend no longer silently calls `http://localhost:8000`
 
-## Remaining (manual)
-- In Vercel project `egy` set Root Directory to `apps/frontend` and Framework to Next.js
-- Rotate `SECRET_KEY` and DB password in every deployed environment
-- Run `alembic upgrade head` on Postgres before production
-- Add refresh tokens if sessions must last beyond 15 minutes
-- Do not treat `egy-thfd` READY as production-ready backend
+## Remaining (manual, pre-merge)
+- Deploy FastAPI + PostgreSQL somewhere reachable (not localhost / Compose names)
+- Set Vercel `NEXT_PUBLIC_API_URL` to that HTTPS origin (name only in dashboards; do not commit secrets)
+- Add the Vercel frontend origin to `BACKEND_CORS_ORIGINS`
+- Run `alembic upgrade head` on that Postgres
+- Confirm GET `/health/live` and `/health/ready` return 200
+- Do not merge PR #16 until Vercel Next.js → FastAPI → PostgreSQL is verified

@@ -1,5 +1,6 @@
 'use client';
 import { FormEvent, useState } from 'react';
+import { getApiBase } from '../../../lib/api';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -8,8 +9,12 @@ export default function Login() {
 
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const api = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    const res = await fetch(`${api}/api/v1/auth/login`, {
+    const api = getApiBase();
+    if (!api.ok) {
+      setMessage(api.reason);
+      return;
+    }
+    const res = await fetch(`${api.base}/api/v1/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: email, password })
