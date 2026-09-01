@@ -1,12 +1,22 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
+from sqlalchemy import text
+
+from app.db.session import engine
 
 router = APIRouter()
 
-# Use explicit "/" path to register a "GET /health" endpoint that also
-# plays nicely with FastAPI's automatic trailing‑slash handling.
-# When the path was an empty string, requesting "/health/" resulted in a
-# 404 even though the intention is to expose a conventional health check
-# endpoint at that URL.
+
 @router.get("/")
-def read_health():
+@router.get("/live")
+def live():
     return {"status": "ok"}
+
+
+@router.get("/ready")
+def ready():
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+    except Exception:
+        raise HTTPException(status_code=503, detail="database unavailable")
+    return {"status": "ready"}
