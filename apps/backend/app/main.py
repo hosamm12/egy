@@ -18,9 +18,11 @@ log = logging.getLogger("egysaas")
 app = FastAPI(title="EgySaaS Backend", version="1.0.0")
 
 origins = [str(o).rstrip("/") for o in settings.BACKEND_CORS_ORIGINS]
+origins = [o for o in origins if 'localhost' not in o and '127.0.0.1' not in o]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins or ["http://localhost:3000"],
+    allow_origins=origins,
+    allow_origin_regex=r"https://.*\\.vercel\\.app",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
