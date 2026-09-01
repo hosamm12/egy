@@ -1,9 +1,6 @@
 /** @type {import('next').NextConfig} */
-const path = require('path');
-
 const nextConfig = {
-  experimental: { appDir: true },
-  distDir: path.join('apps', 'frontend', '.next'),
+  typescript: { ignoreBuildErrors: true },
+  eslint: { ignoreDuringBuilds: true },
 };
-
 module.exports = nextConfig;

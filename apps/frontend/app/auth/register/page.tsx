@@ -1,16 +1,16 @@
 'use client';
-import { useState } from 'react';
+import { FormEvent, useState } from 'react';
 
 export default function Register() {
-  const [email, setEmail] = useState('user@example.com');
-  const [password, setPassword] = useState('Welcome123');
-  const [fullName, setFullName] = useState('User');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
   const [message, setMessage] = useState('');
 
-  const onSubmit = async (e) => {
+  const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const api = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    const res = await fetch(`${api}/auth/register`, {
+    const res = await fetch(`${api}/api/v1/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password, full_name: fullName })
