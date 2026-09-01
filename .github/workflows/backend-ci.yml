@@ -2,8 +2,13 @@ name: Backend CI
 
 on:
   pull_request:
+    branches: [main]
   push:
     branches: [main, audit/backend-hardening]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   test:

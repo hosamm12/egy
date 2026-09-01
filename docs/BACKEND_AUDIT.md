@@ -6,9 +6,11 @@ Branch: `audit/backend-hardening` (do not merge without review).
 Frontend Next.js → FastAPI (`/auth` and `/api/v1/*`) → PostgreSQL.
 Redis/Celery and `apps/agents` remain demo services. No trip/booking domain exists in the frontend, so none was invented.
 
-Deployment: Docker Compose / GHCR image build. FastAPI is **not** a Vercel app in this repo.
+Deployment: Docker Compose / GHCR image build. FastAPI is **not** hosted as the Vercel runtime.
+Vercel project `egy` was set to Blitz/Next at the **repo root**, so builds failed with NEXT_NO_VERSION until a root `package.json` + `vercel.json` pointed install/build at `apps/frontend`.
+Vercel project `egy-thfd` being READY only means a framework-less empty build succeeded — it is not proof of production API/DB health.
 
-## Implemented in this branch
+## Implemented
 - JWT subject is user id; inactive users blocked
 - Password strength (10+ chars, letter + number)
 - Login rate limit per IP
@@ -18,13 +20,12 @@ Deployment: Docker Compose / GHCR image build. FastAPI is **not** a Vercel app i
 - `/files/sample` requires auth + path confinement
 - Alembic migration `0001_users`
 - `create_all` only outside production
-- Admin seed requires `ADMIN_PASSWORD` env (no hardcoded `admin123`)
-- Pytest auth/files/health coverage
-- GitHub Actions `backend-ci.yml`
+- Admin seed requires `ADMIN_PASSWORD` env
+- Pytest in `blank.yml` (the workflow that actually runs jobs) and `backend-ci.yml`
 
 ## Remaining (manual)
+- In Vercel project `egy` set Root Directory to `apps/frontend` and Framework to Next.js
 - Rotate `SECRET_KEY` and DB password in every deployed environment
 - Run `alembic upgrade head` on Postgres before production
-- Add refresh tokens / revocation store if sessions must last beyond 15 minutes
-- Booking domain only when the product UI needs it
-- Agents still demo; do not grant them DB write credentials
+- Add refresh tokens if sessions must last beyond 15 minutes
+- Do not treat `egy-thfd` READY as production-ready backend
