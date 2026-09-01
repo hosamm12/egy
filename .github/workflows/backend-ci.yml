@@ -15,6 +15,7 @@ jobs:
       DATABASE_URL: sqlite+pysqlite:///:memory:
       SECRET_KEY: ci-secret-key-not-for-production
       ENV: test
+      PYTHONPATH: .
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
